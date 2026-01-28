@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using Microsoft.Extensions.Logging;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
@@ -7,29 +5,24 @@ using EndfieldBot.Helpers;
 
 namespace EndfieldBot.Commands;
 
-public class MiscCommandHandler(ILogger<MiscCommandHandler> logger): ApplicationCommandModule<ApplicationCommandContext>
+public class MiscCommandHandler(): ApplicationCommandModule<ApplicationCommandContext>
 {
-    [SlashCommand("latency", "Checks the latency of bot")]
-    public string HandleLatency()
-    {
-        var latency = Context.Client.Latency.TotalMilliseconds;
-        return $"`Latency: {latency}ms`";
-    }
-
     [SlashCommand("sysinfo", "Dump sysinfo")]
-    public async Task<InteractionMessageProperties> HandleSysInfo()
+    public async Task HandleSysInfo()
     {
         if (Context.Interaction.User.Id != 793688107077468171)
         {
-            return new InteractionMessageProperties()
+            var noAuthMessage = new InteractionMessageProperties()
                 .WithContent("You are not authorized to use this command!")
                 .WithFlags(MessageFlags.Ephemeral);
-            
+            await RespondAsync(InteractionCallback.Message(noAuthMessage));
+            return;
         }
 
+        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Loading));
         var latency = Context.Client.Latency.TotalMilliseconds;
-    
-        return new InteractionMessageProperties()
+
+        var response = new InteractionMessageProperties()
             .AddEmbeds(new EmbedProperties()
                 .WithTitle("SysInfo for Endmin Bot")
                 .WithColor(new Color(0x03fc39))
@@ -60,5 +53,6 @@ public class MiscCommandHandler(ILogger<MiscCommandHandler> logger): Application
                         .WithValue($"`{LinuxMetrics.GetProcessMemoryMb()} MB`")
                         .WithInline(true),
                 ]));
+        await FollowupAsync(response);
     }
 }
