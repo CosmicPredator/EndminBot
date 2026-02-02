@@ -18,8 +18,8 @@ public record EfHomeModelEvent(
     [property: JsonPropertyName("endDate")] DateTime? EndDate,
     [property: JsonPropertyName("coverImage")] string CoverImage,
     [property: JsonPropertyName("url")] string Url,
-    [property: JsonPropertyName("active")] bool? Active,
-    [property: JsonPropertyName("notConfirmed")] bool? NotConfirmed,
+    [property: JsonPropertyName("active")] bool Active,
+    [property: JsonPropertyName("notConfirmed")] bool NotConfirmed,
     [property: JsonPropertyName("tintColor")] string TintColor
 );
 

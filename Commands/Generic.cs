@@ -1,5 +1,8 @@
+using EndfieldBot.DB;
 using EndfieldBot.Interfaces;
 using EndfieldBot.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetCord;
 using NetCord.Rest;
@@ -9,36 +12,20 @@ using NetCord.Services.ComponentInteractions;
 namespace EndfieldBot.Commands;
 
 public class GenericCommandHandler(
-    IRequestHandler requestHandler,
-    SimpleCache cache,
-    ILogger<GenericCommandHandler> logger
+    IDbContextFactory<EndfieldBotDbContext> dbContextFactory,
+    ILogger<GenericCommandHandler> logger,
+    IConfiguration configuration
 ) : ApplicationCommandModule<ApplicationCommandContext>
 {
+    private EndfieldBotDbContext dbContext = dbContextFactory.CreateDbContext();
+
     [SlashCommand("code", "Latest redeem codes")]
     public async Task HandleCodeCommandAsync()
     {
-        await RespondAsync(InteractionCallback.DeferredMessage());
-        if (cache.Codes is null)
-        {
-            logger.LogInformation("Cache not found, performing HTTP request");
-            var url = "https://endfieldtools.dev/localdb/home-page.json";
-            var request = await requestHandler.GetAsync<EfHomeModel>(url);
-
-            if (request is null)
-            {
-                await FollowupAsync(new InteractionMessageProperties()
-                    .WithContent("Request to Endfield Database failed!")
-                    .WithFlags(MessageFlags.Ephemeral));
-                return;
-            }
-            cache.Codes = request.Codes;
-            cache.Events = request.Events;
-        }
-
         var codeFields = new List<EmbedFieldProperties>();
-        foreach (var i in cache.Codes)
+        foreach (var i in dbContext.RedeemCodes.AsNoTracking())
         {
-            if (i.Active)
+            if (i.IsActive)
             {
                 var description = i.Description is "?" ? "No Info" : i.Description;
                 codeFields.Add(new EmbedFieldProperties()
@@ -55,47 +42,33 @@ public class GenericCommandHandler(
                 .WithColor(new Color(0xae00ff))
             );
 
-        await FollowupAsync(message);
+        await RespondAsync(InteractionCallback.Message(message));
     }
 
     [SlashCommand("events", "Ongoing events in Endfield")]
     public async Task HandleEventCommandAsync()
     {
-        await RespondAsync(InteractionCallback.DeferredMessage());
-
-        if (cache.Events is null)
-        {
-            logger.LogInformation("Cache not found, performing HTTP request");
-            var url = "https://endfieldtools.dev/localdb/home-page.json";
-            var request = await requestHandler.GetAsync<EfHomeModel>(url);
-
-            if (request is null)
-            {
-                await FollowupAsync(new InteractionMessageProperties()
-                    .WithContent("Request to Endfield Database failed!")
-                    .WithFlags(MessageFlags.Ephemeral));
-                return;
-            }
-            cache.Codes = request.Codes;
-            cache.Events = request.Events;
-        }
-
-        var msgBody = new EventEmbedBuilder(logger).BuildMessage(cache.Events[0], 0, cache.Events.Count);
-        await FollowupAsync(new InteractionMessageProperties()
+        var events = dbContext.CurrentEvents.AsNoTracking();
+        var msgBody = new EventEmbedBuilder(logger).BuildMessage(events.First(), 0, events.Count(), configuration);
+        await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties()
             .AddEmbeds(msgBody.Embeds!)
-            .AddComponents(msgBody.Components!));
+            .AddComponents(msgBody.Components!)));
     }
 }
 
 public class EventComponentInteraction(
-    SimpleCache cache,
-    ILogger<EventComponentInteraction> logger
+    IDbContextFactory<EndfieldBotDbContext> dbContextFactory,
+    ILogger<EventComponentInteraction> logger,
+    IConfiguration configuration
 ) : ComponentInteractionModule<ButtonInteractionContext>
 {
+    private EndfieldBotDbContext dbContext = dbContextFactory.CreateDbContext();
+
     [ComponentInteraction("event")]
     public async Task HandleEvent(int eventId)
     {
-        if (cache.Events is null)
+        var events = dbContext.CurrentEvents.AsNoTracking();
+        if (!events.Any())
         {
             await RespondAsync(InteractionCallback.ModifyMessage(message =>
             {
@@ -104,11 +77,10 @@ public class EventComponentInteraction(
             }));
             return;
         }
-        var efEvent = cache.Events[eventId];
-
+        var efEvent = events.ElementAt(eventId);
         await RespondAsync(InteractionCallback.ModifyMessage(message =>
         {
-            var msgBody = new EventEmbedBuilder(logger).BuildMessage(efEvent, eventId, cache.Events.Count);
+            var msgBody = new EventEmbedBuilder(logger).BuildMessage(efEvent, eventId, events.Count(), configuration);
             message.AddEmbeds(msgBody.Embeds!);
             message.AddComponents(msgBody.Components!);
         }));
@@ -123,9 +95,9 @@ public class MessageBody
 
 public class EventEmbedBuilder(ILogger logger)
 {
-    public MessageBody BuildMessage(EfHomeModelEvent efEvent, int index, int maxSize)
+    public MessageBody BuildMessage(CurrentEvents efEvent, int index, int maxSize, IConfiguration config)
     {
-        var baseHost = "https://endfieldtools.dev";
+        var baseHost = config["Endfield:BaseHost"]!;
         var actionRow = new ActionRowProperties()
             .WithId(new Random().Next());
         if (index > 0)
