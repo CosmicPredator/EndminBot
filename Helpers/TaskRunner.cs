@@ -43,6 +43,7 @@ public class TaskRunner : BackgroundService
 
         await using var tx = await dbContext.Database.BeginTransactionAsync();
         await dbContext.Database.ExecuteSqlRawAsync("DELETE FROM RedeemCodes");
+        await dbContext.Database.ExecuteSqlRawAsync("DELETE FROM CurrentEvents");
         await tx.CommitAsync();
 
         await dbContext.RedeemCodes.AddRangeAsync(result.Codes.Select(x => x.ToEntity()));

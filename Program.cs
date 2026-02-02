@@ -48,12 +48,12 @@ using(var scope = host.Services.CreateAsyncScope())
     using var db = await dbContext.CreateDbContextAsync();
     await db.Database.MigrateAsync();
 
-    // var taskRunner = scope.ServiceProvider.GetRequiredService<TaskQueue>();
-    // taskRunner.Enqueue(new TaskQueueItem()
-    // {
-    //     Type = TaskType.RefreshCodeEvent,
-    //     Params = null
-    // });
+    var taskRunner = scope.ServiceProvider.GetRequiredService<TaskQueue>();
+    taskRunner.Enqueue(new TaskQueueItem()
+    {
+        Type = TaskType.RefreshCodeEvent,
+        Params = null
+    });
 }
 
 await host.RunAsync();
