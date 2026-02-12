@@ -28,11 +28,7 @@ builder.Services
     })
     .AddDiscordGateway(options =>
         {
-            options.Intents = GatewayIntents.GuildMessages
-                | GatewayIntents.DirectMessages
-                | GatewayIntents.MessageContent
-                | GatewayIntents.DirectMessageReactions
-                | GatewayIntents.GuildMessageReactions;
+            options.Intents = GatewayIntents.All;
         })
     .AddApplicationCommands()
     .AddComponentInteractions<ButtonInteraction, ButtonInteractionContext>()
@@ -48,12 +44,13 @@ using(var scope = host.Services.CreateAsyncScope())
     using var db = await dbContext.CreateDbContextAsync();
     await db.Database.MigrateAsync();
 
-    var taskRunner = scope.ServiceProvider.GetRequiredService<TaskQueue>();
-    taskRunner.Enqueue(new TaskQueueItem()
-    {
-        Type = TaskType.RefreshCodeEvent,
-        Params = null
-    });
+    // TODO: Uncomment Afterwards Lol
+    // var taskRunner = scope.ServiceProvider.GetRequiredService<TaskQueue>();
+    // taskRunner.Enqueue(new TaskQueueItem()
+    // {
+    //     Type = TaskType.RefreshCodeEvent,
+    //     Params = null
+    // });
 }
 
 await host.RunAsync();
